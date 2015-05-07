@@ -1,0 +1,97 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'maven'
+apply plugin: 'signing'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+group = "io.innerloop"
+version = "0.1.0-SNAPSHOT"
+ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.2.1'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.7'
+    compile group: 'org.springframework', name: 'spring-context', version:'4.1.6.RELEASE'
+    compile group: 'org.springframework', name: 'spring-tx', version:'4.1.6.RELEASE'
+    compile group: 'io.innerloop', name:'java-neo4j-ogm', version: '0.2.0-SNAPSHOT'
+}
+
+javadoc {
+    failOnError = false
+}
+
+task javadocJar(type: Jar) {
+    classifier = 'javadoc'
+    from javadoc
+}
+
+task sourcesJar(type: Jar) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+signing {
+    required { isReleaseVersion && gradle.taskGraph.hasTask("uploadArchives") }
+    sign configurations.archives
+}
+
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: System.getProperty('nexusUsername'), password: System.getProperty('nexusPassword'))
+            }
+
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: System.getProperty('nexusUsername'), password: System.getProperty('nexusPassword'))
+            }
+
+            pom.project {
+                name project.name
+                packaging 'jar'
+                description 'Spring integration for Java Neo4J Object Graph Mapper (OGM)'
+                url 'https://github.com/inner-loop/spring-neo4j-ogm'
+
+                scm {
+                    connection 'git@github.com:inner-loop/spring-neo4j-ogm.git'
+                    developerConnection 'git@github.com:inner-loop/spring-neo4j-ogm.git'
+                    url 'https://github.com/inner-loop/spring-neo4j-ogm'
+                }
+
+                licenses {
+                    license {
+                        name 'GNU GENERAL PUBLIC LICENSE, Version 2.0'
+                        url 'http://www.gnu.org/licenses/gpl-2.0.html'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id 'mangrish'
+                        name 'Mark Angrish'
+                        email 'mark.angrish@innerloop.io'
+                    }
+                }
+            }
+        }
+    }
+}
+
