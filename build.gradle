@@ -25,7 +25,7 @@ dependencies {
     compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.7'
     compile group: 'org.springframework', name: 'spring-context', version:'4.1.6.RELEASE'
     compile group: 'org.springframework', name: 'spring-tx', version:'4.1.6.RELEASE'
-    compile group: 'io.innerloop', name:'java-neo4j-ogm', version: '0.2.0-SNAPSHOT'
+    compile group: 'io.innerloop', name:'java-neo4j-ogm', version: '0.2.0-SNAPSHOT', changing: true
 }
 
 javadoc {
