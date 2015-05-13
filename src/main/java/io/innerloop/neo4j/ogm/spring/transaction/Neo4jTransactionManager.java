@@ -3,8 +3,6 @@ package io.innerloop.neo4j.ogm.spring.transaction;
 import io.innerloop.neo4j.ogm.Session;
 import io.innerloop.neo4j.ogm.SessionFactory;
 import io.innerloop.neo4j.ogm.Transaction;
-import org.springframework.beans.factory.BeanFactory;
-import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.TransactionDefinition;
@@ -19,17 +17,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * Created by markangrish on 08/05/2015.
  */
 public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
-        implements ResourceTransactionManager, BeanFactoryAware, InitializingBean
+        implements ResourceTransactionManager, InitializingBean
 {
     private SessionFactory sessionFactory;
 
-    /**
-     * Just needed for entityInterceptorBeanName.
-     */
-    private BeanFactory beanFactory;
-
     public Neo4jTransactionManager()
     {
+        setGlobalRollbackOnParticipationFailure(false);
     }
 
     /**
@@ -40,6 +34,7 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
      */
     public Neo4jTransactionManager(SessionFactory sessionFactory)
     {
+        this();
         this.sessionFactory = sessionFactory;
         afterPropertiesSet();
     }
@@ -69,12 +64,7 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
         SessionHolder sessionHolder = (SessionHolder) TransactionSynchronizationManager.getResource(getSessionFactory());
         if (sessionHolder != null)
         {
-            if (logger.isDebugEnabled())
-            {
-                logger.debug("Found thread-bound Session [" + sessionHolder.getSession() +
-                             "] for Neo4J OGM transaction");
-            }
-            txObject.setSessionHolder(sessionHolder);
+            txObject.setSessionHolder(sessionHolder, false);
         }
 
         return txObject;
@@ -94,31 +84,28 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
 
                 if (logger.isDebugEnabled())
                 {
-                    logger.debug("Opened new Session [" + newSession + "] for Neo4j OGM transaction");
+                    logger.debug("Acquired Session [" + newSession + "] for Neo4j OGM transaction");
                 }
-                txObject.setSession(newSession);
+                txObject.setSessionHolder(new SessionHolder(newSession), true);
             }
 
+            txObject.getSessionHolder().setSynchronizedWithTransaction(true);
             session = txObject.getSessionHolder().getSession();
-
 
             Transaction neo4jTransaction = session.getTransaction();
             neo4jTransaction.begin();
 
             txObject.getSessionHolder().setTransaction(neo4jTransaction);
 
-
             // Bind the session holder to the thread.
             if (txObject.isNewSessionHolder())
             {
                 TransactionSynchronizationManager.bindResource(getSessionFactory(), txObject.getSessionHolder());
             }
-            txObject.getSessionHolder().setSynchronizedWithTransaction(true);
         }
-
         catch (Throwable ex)
         {
-            if (txObject.isNewSession())
+            if (txObject.isNewSessionHolder())
             {
                 try
                 {
@@ -126,10 +113,6 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
                     {
                         session.getTransaction().rollback();
                     }
-                }
-                catch (Throwable ex2)
-                {
-                    logger.debug("Could not rollback Session after failed transaction begin", ex);
                 }
                 finally
                 {
@@ -144,7 +127,7 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
                             logger.debug("Unexpected exception on closing Neo4j OGM Session", ex2);
                         }
                     }
-                    txObject.setSessionHolder(null);
+                    txObject.setSessionHolder(null, false);
                 }
             }
             throw new CannotCreateTransactionException("Could not open OGM Session for transaction", ex);
@@ -155,44 +138,39 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
     protected void doCommit(DefaultTransactionStatus status) throws TransactionException
     {
         Neo4jTransactionObject txObject = (Neo4jTransactionObject) status.getTransaction();
+        Session session = txObject.getSessionHolder().getSession();
         if (status.isDebug())
         {
             logger.debug("Committing Neo4j OGM transaction on Session [" +
-                         txObject.getSessionHolder().getSession() + "]");
+                         session + "]");
         }
-        txObject.getSessionHolder().getTransaction().commit();
+        session.getTransaction().commit();
     }
 
     @Override
-    protected boolean isExistingTransaction(Object transaction) throws TransactionException {
+    protected boolean isExistingTransaction(Object transaction) throws TransactionException
+    {
         Neo4jTransactionObject txObject = (Neo4jTransactionObject) transaction;
 
         return txObject.getSessionHolder() != null && txObject.getSessionHolder().getTransaction().isActive();
     }
 
     @Override
+    protected void doSetRollbackOnly(DefaultTransactionStatus status) throws TransactionException {
+        status.setRollbackOnly();
+    }
+
+    @Override
     protected void doRollback(DefaultTransactionStatus status) throws TransactionException
     {
-        logger.info("Rolling back a transaction.");
         Neo4jTransactionObject txObject = (Neo4jTransactionObject) status.getTransaction();
+        Session session = txObject.getSessionHolder().getSession();
         if (status.isDebug())
         {
             logger.debug("Rolling back Neo4j OGM transaction on Session [" +
-                         txObject.getSessionHolder().getSession() + "]");
+                         session + "]");
         }
-        try
-        {
-            txObject.getSessionHolder().getTransaction().rollback();
-        }
-        finally
-        {
-            if (!txObject.isNewSession())
-            {
-                // Clear all pending inserts/updates/deletes in the Session.
-                // Necessary for pre-bound Sessions, to avoid inconsistent state.
-                txObject.getSessionHolder().getSession().clear();
-            }
-        }
+        session.getTransaction().rollback();
     }
 
     @Override
@@ -208,44 +186,18 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
 
         Session session = txObject.getSessionHolder().getSession();
 
-        if (txObject.isNewSession())
+        if (logger.isDebugEnabled())
         {
-            if (logger.isDebugEnabled())
-            {
-                logger.debug("Closing Neo4j OGM Session [" + session + "] after transaction");
-            }
-            if (session != null)
-            {
-                try
-                {
-                    session.close();
-                }
-                catch (Throwable ex)
-                {
-                    logger.debug("Unexpected exception on closing Neo4j OGM Session", ex);
-                }
-            }
+            logger.debug("Closing Neo4j OGM Session [" + session + "] after transaction");
         }
-        else
+        if (session != null)
         {
-            if (logger.isDebugEnabled())
-            {
-                logger.debug("Not closing pre-bound Neo4j OGM  Session [" + session + "] after transaction");
-            }
+            session.close();
         }
+
         txObject.getSessionHolder().clear();
     }
 
-
-    /**
-     * The bean factory just needs to be known for resolving entity interceptor bean names. It does not need to be set
-     * for any other mode of operation.
-     */
-    @Override
-    public void setBeanFactory(BeanFactory beanFactory)
-    {
-        this.beanFactory = beanFactory;
-    }
 
     @Override
     public void afterPropertiesSet()
@@ -271,30 +223,23 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
 
         private boolean newSessionHolder;
 
-        private boolean newSession;
-
-        private Integer previousHoldability;
-
 
         public void setSession(Session session)
         {
             this.sessionHolder = new SessionHolder(session);
             this.newSessionHolder = true;
-            this.newSession = true;
         }
 
         public void setExistingSession(Session session)
         {
             this.sessionHolder = new SessionHolder(session);
             this.newSessionHolder = true;
-            this.newSession = false;
         }
 
-        public void setSessionHolder(SessionHolder sessionHolder)
+        public void setSessionHolder(SessionHolder sessionHolder, boolean newConnectionHolder)
         {
             this.sessionHolder = sessionHolder;
-            this.newSessionHolder = false;
-            this.newSession = false;
+            this.newSessionHolder = newConnectionHolder;
         }
 
         public SessionHolder getSessionHolder()
@@ -307,10 +252,6 @@ public class Neo4jTransactionManager extends AbstractPlatformTransactionManager
             return this.newSessionHolder;
         }
 
-        public boolean isNewSession()
-        {
-            return this.newSession;
-        }
 
         public void setRollbackOnly()
         {
