@@ -41,16 +41,6 @@ public class SpringTest
 {
     private static final Logger LOG = (Logger) LoggerFactory.getLogger(SpringTest.class);
 
-    private static final int DEFAULT_NEO_PORT = 7575;
-
-    private Neo4jClient client;
-
-    private int neoServerPort = -1;
-
-    private GraphDatabaseService database;
-
-    private WrappingNeoServerBootstrapper bootstrapper;
-
     @BeforeClass
     public static void oneTimeSetUp()
     {
@@ -59,64 +49,7 @@ public class SpringTest
         rootLogger.setLevel(Level.DEBUG);
     }
 
-    private static int findOpenLocalPort()
-    {
-        try (ServerSocket socket = new ServerSocket(0))
-        {
-            return socket.getLocalPort();
-        }
-        catch (IOException e)
-        {
-            System.err.println("Unable to establish local port due to IOException: " + e.getMessage() +
-                               "\nDefaulting instead to use: " + DEFAULT_NEO_PORT);
-            e.printStackTrace(System.err);
 
-            return DEFAULT_NEO_PORT;
-        }
-    }
-
-    @Before
-    public void setUp() throws IOException, InterruptedException
-    {
-        database = new TestGraphDatabaseFactory().newImpermanentDatabase();
-        Runtime.getRuntime().addShutdownHook(new Thread()
-        {
-            @Override
-            public void run()
-            {
-                database.shutdown();
-            }
-        });
-        ServerConfigurator configurator = new ServerConfigurator((GraphDatabaseAPI) database);
-        int port = neoServerPort();
-        configurator.configuration().addProperty(Configurator.WEBSERVER_PORT_PROPERTY_KEY, port);
-        configurator.configuration().addProperty("dbms.security.auth_enabled", false);
-        bootstrapper = new WrappingNeoServerBootstrapper((GraphDatabaseAPI) database, configurator);
-        bootstrapper.start();
-        while (!bootstrapper.getServer().getDatabase().isRunning())
-        {
-            // It's ok to spin here.. it's not production code.
-            Thread.sleep(250);
-        }
-        client = new Neo4jClient("http://localhost:" + port + "/db/data");
-    }
-
-    protected int neoServerPort()
-    {
-        if (neoServerPort < 0)
-        {
-            neoServerPort = findOpenLocalPort();
-        }
-        return neoServerPort;
-    }
-
-    @After
-    public void tearDown() throws IOException, InterruptedException
-    {
-        bootstrapper.stop();
-        database.shutdown();
-        client = null;
-    }
 
     @Autowired
     private PersonRepository personRepository;
