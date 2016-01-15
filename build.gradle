@@ -6,7 +6,8 @@ apply plugin: 'signing'
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 group = "io.innerloop"
-version = "0.2.0-SNAPSHOT"
+archivesBaseName = "spring-neo4j-ogm"
+version = "0.2.0"
 ext.isReleaseVersion = !version.endsWith("SNAPSHOT")
 
 task wrapper(type: Wrapper) {
@@ -33,7 +34,7 @@ dependencies {
     compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.7'
     compile group: 'org.springframework', name: 'spring-context', version:'4.2.4.RELEASE'
     compile group: 'org.springframework', name: 'spring-tx', version:'4.2.4.RELEASE'
-    compile group: 'io.innerloop', name:'java-neo4j-ogm', version: '0.3.0-SNAPSHOT', changing: true
+    compile group: 'io.innerloop', name:'java-neo4j-ogm', version: '0.3.0'
 }
 
 javadoc {
@@ -66,15 +67,15 @@ uploadArchives {
             beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
 
             repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                authentication(userName: System.getProperty('nexusUsername'), password: System.getProperty('nexusPassword'))
+                authentication(userName: ossrhUsername, password: ossrhPassword)
             }
 
             snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-                authentication(userName: System.getProperty('nexusUsername'), password: System.getProperty('nexusPassword'))
+                authentication(userName: ossrhUsername, password: ossrhPassword)
             }
 
             pom.project {
-                name project.name
+                name 'Spring Neo4J OGM'
                 packaging 'jar'
                 description 'Spring integration for Java Neo4J Object Graph Mapper (OGM)'
                 url 'https://github.com/inner-loop/spring-neo4j-ogm'

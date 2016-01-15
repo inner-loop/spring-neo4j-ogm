@@ -20,7 +20,7 @@ Add the following to your ```<dependencies> .. </dependencies>``` section.
 <dependency>
     <groupId>io.innerloop</groupId>
     <artifactId>spring-neo4j-ogm/artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -29,14 +29,54 @@ Add the following to your ```<dependencies> .. </dependencies>``` section.
 Add the following to your ```dependencies { .. }``` section.
 
 ```gradle
-compile group: 'io.innerloop', name: 'spring-neo4j-ogm', version: '0.1.0'
+compile group: 'io.innerloop', name: 'spring-neo4j-ogm', version: '0.2.0'
 ```
 
 ... or more simply:
 
 ```gradle
-compile: 'io.innerloop:spring-neo4j-ogm:0.1.0'
+compile: 'io.innerloop:spring-neo4j-ogm:0.2.0'
 ```
 
 
-See (Java Neo4J OGM)[https://github.com/inner-loop/java-neo4j-ogm] for more details.
+See (Java Neo4J OGM)[https://github.com/inner-loop/java-neo4j-ogm] for more details on how to use this library.
+
+# Examples
+
+## Using applicationContext.xml
+
+```
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                            http://www.springframework.org/schema/beans/spring-beans-4.1.xsd
+                            http://www.springframework.org/schema/context
+                            http://www.springframework.org/schema/context/spring-context-4.1.xsd
+                            http://www.springframework.org/schema/tx
+                            http://www.springframework.org/schema/tx/spring-tx-4.1.xsd">
+
+
+    <tx:annotation-driven transaction-manager="txManager" />
+    <context:spring-configured/>
+    <context:annotation-config/>
+    <context:component-scan base-package="io.innerloop"/>
+
+    <bean id="txManager" class="io.innerloop.neo4j.ogm.spring.transaction.Neo4jTransactionManager">
+        <constructor-arg ref="sessionFactory"/>
+    </bean>
+
+    <bean id="neo4jClient" class="io.innerloop.neo4j.client.Neo4jClient">
+        <constructor-arg value="#{systemProperties['neo4j.rest.url']}" index="0"/>
+        <constructor-arg value="#{systemProperties['neo4j.rest.username']}" index="1"/>
+        <constructor-arg value="#{systemProperties['neo4j.rest.password']}" index="2"/>
+    </bean>
+
+    <bean id="sessionFactory" class="io.innerloop.neo4j.ogm.SessionFactory">
+        <constructor-arg ref="neo4jClient"/>
+        <constructor-arg value="io.innerloop.insight.domain"/>
+    </bean>
+</beans>
+```
