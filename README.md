@@ -1,6 +1,9 @@
 spring-neo4j-ogm
 ===============
 
+***NOTE: This project is no longer actively developed supported however, I am an active developer now on the [the official Spring project](https://github.com/spring-projects/spring-data-neo4j) that integrates with [the Neo4j OGM](https://github.com/neo4j/neo4j-ogm) and recommend developers use those from now on.***
+
+
 Spring integration for (Java Neo4J OGM)[https://github.com/inner-loop/java-neo4j-ogm].
 
 [![Build Status](https://travis-ci.org/inner-loop/spring-neo4j-ogm.svg?branch=master)](https://travis-ci.org/inner-loop/spring-neo4j-ogm)
